@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Management System</title>
+  <meta name="description" content="Full-stack project management system with task tracking, team management, and Kanban board">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --surface2: #334155; --border: #475569;
+      --text: #f1f5f9; --text2: #94a3b8; --primary: #3b82f6; --primary-hover: #2563eb;
+      --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; --purple: #a855f7;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .app { display: flex; min-height: 100vh; }
+    .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 20px 0; display: flex; flex-direction: column; position: fixed; height: 100vh; overflow-y: auto; }
+    .sidebar h1 { padding: 0 20px; font-size: 18px; margin-bottom: 30px; color: var(--primary); }
+    .sidebar nav a { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: var(--text2); text-decoration: none; transition: all 0.2s; font-size: 14px; }
+    .sidebar nav a:hover, .sidebar nav a.active { background: var(--surface2); color: var(--text); }
+    .sidebar nav a.active { border-right: 3px solid var(--primary); }
+    .main { margin-left: 260px; flex: 1; padding: 30px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .header h2 { font-size: 24px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .stat-card .label { font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+    .stat-card .value { font-size: 28px; font-weight: 700; }
+    .stat-card .value.blue { color: var(--primary); }
+    .stat-card .value.green { color: var(--success); }
+    .stat-card .value.yellow { color: var(--warning); }
+    .stat-card .value.red { color: var(--danger); }
+    .stat-card .value.purple { color: var(--purple); }
+    .btn { padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+    th { color: var(--text2); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .badge-todo { background: rgba(148,163,184,0.2); color: var(--text2); }
+    .badge-progress { background: rgba(59,130,246,0.2); color: var(--primary); }
+    .badge-review { background: rgba(168,85,247,0.2); color: var(--purple); }
+    .badge-done { background: rgba(34,197,94,0.2); color: var(--success); }
+    .badge-low { background: rgba(34,197,94,0.15); color: var(--success); }
+    .badge-medium { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .badge-high { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .kanban { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .kanban-col { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-height: 400px; }
+    .kanban-col h3 { font-size: 14px; color: var(--text2); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .kanban-col h3 span { background: var(--surface2); padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+    .task-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s; }
+    .task-card:hover { border-color: var(--primary); }
+    .task-card .title { font-size: 14px; margin-bottom: 6px; }
+    .task-card .meta { font-size: 12px; color: var(--text2); display: flex; justify-content: space-between; }
+    .progress-bar { width: 100%; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+    .progress-bar .fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 100; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 90%; max-width: 500px; }
+    .modal h3 { margin-bottom: 20px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white; }
+    .empty-state { text-align: center; padding: 40px; color: var(--text2); }
+    .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .team-card { display: flex; align-items: center; gap: 14px; }
+    .team-card .info h4 { font-size: 15px; }
+    .team-card .info p { font-size: 13px; color: var(--text2); }
+    @media (max-width: 768px) { .sidebar { display: none; } .main { margin-left: 0; } .kanban { grid-template-columns: 1fr; } .form-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <noscript><div style="padding:40px;text-align:center;color:#f1f5f9;background:#0f172a;min-height:100vh"><h1>Project Management System</h1><p>JavaScript is required to run this application.</p></div></noscript>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>ProjectHub</h1>
+      <nav>
+        <a href="#" class="active" data-page="dashboard">Dashboard</a>
+        <a href="#" data-page="projects">Projects</a>
+        <a href="#" data-page="tasks">Tasks</a>
+        <a href="#" data-page="kanban">Kanban Board</a>
+        <a href="#" data-page="team">Team</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <!-- Dashboard -->
+      <div id="dashboard" class="page active">
+        <div class="header"><h2>Dashboard</h2></div>
+        <div class="stats" id="dashStats"></div>
+        <div class="card">
+          <h3 style="margin-bottom:16px">Recent Tasks</h3>
+          <table><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Status</th><th>Priority</th></tr></thead><tbody id="recentTasks"></tbody></table>
+        </div>
+      </div>
+      <!-- Projects -->
+      <div id="projects" class="page">
+        <div class="header"><h2>Projects</h2><button class="btn btn-primary" onclick="openModal('projectModal')">+ New Project</button></div>
+        <div id="projectList"></div>
+      </div>
+      <!-- Tasks -->
+      <div id="tasks" class="page">
+        <div class="header"><h2>Tasks</h2><button class="btn btn-primary" onclick="openModal('taskModal')">+ New Task</button></div>
+        <div class="card"><table><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due</th><th>Actions</th></tr></thead><tbody id="taskTable"></tbody></table></div>
+      </div>
+      <!-- Kanban -->
+      <div id="kanban" class="page">
+        <div class="header"><h2>Kanban Board</h2></div>
+        <div class="kanban" id="kanbanBoard"></div>
+      </div>
+      <!-- Team -->
+      <div id="team" class="page">
+        <div class="header"><h2>Team</h2><button class="btn btn-primary" onclick="openModal('memberModal')">+ Add Member</button></div>
+        <div class="team-grid" id="teamGrid"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modals -->
+  <div class="modal-overlay" id="projectModal">
+    <div class="modal">
+      <h3>New Project</h3>
+      <div class="form-group"><label>Name</label><input id="pName" placeholder="Project name"></div>
+      <div class="form-group"><label>Description</label><textarea id="pDesc" rows="3" placeholder="Brief description"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Start Date</label><input type="date" id="pStart"></div>
+        <div class="form-group"><label>Deadline</label><input type="date" id="pEnd"></div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('projectModal')">Cancel</button><button class="btn btn-primary" onclick="addProject()">Create</button></div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="taskModal">
+    <div class="modal">
+      <h3>New Task</h3>
+      <div class="form-group"><label>Title</label><input id="tTitle" placeholder="Task title"></div>
+      <div class="form-group"><label>Description</label><textarea id="tDesc" rows="2" placeholder="Details"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Project</label><select id="tProject"></select></div>
+        <div class="form-group"><label>Assignee</label><select id="tAssignee"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Priority</label><select id="tPriority"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
+        <div class="form-group"><label>Due Date</label><input type="date" id="tDue"></div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('taskModal')">Cancel</button><button class="btn btn-primary" onclick="addTask()">Create</button></div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="memberModal">
+    <div class="modal">
+      <h3>Add Team Member</h3>
+      <div class="form-group"><label>Name</label><input id="mName" placeholder="Full name"></div>
+      <div class="form-group"><label>Role</label><input id="mRole" placeholder="e.g. Frontend Developer"></div>
+      <div class="form-group"><label>Email</label><input id="mEmail" placeholder="email@example.com"></div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('memberModal')">Cancel</button><button class="btn btn-primary" onclick="addMember()">Add</button></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'projecthub_data';
+    const colors = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#f97316','#ec4899'];
+    const color = i => colors[i % colors.length];
+
+    let data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {
+      projects: [
+        { id: 'p1', name: 'Website Redesign', desc: 'Modernize the company website', start: '2026-07-01', end: '2026-08-15' },
+        { id: 'p2', name: 'Mobile App v2', desc: 'iOS and Android release', start: '2026-07-10', end: '2026-09-30' },
+        { id: 'p3', name: 'API Migration', desc: 'Move to REST v3', start: '2026-07-20', end: '2026-08-30' }
+      ],
+      tasks: [
+        { id:'t1', title:'Design homepage mockup', desc:'', project:'p1', assignee:'m1', status:'Done', priority:'High', due:'2026-07-25' },
+        { id:'t2', title:'Set up CI/CD pipeline', desc:'', project:'p1', assignee:'m2', status:'In Progress', priority:'Medium', due:'2026-08-01' },
+        { id:'t3', title:'Build login flow', desc:'', project:'p2', assignee:'m3', status:'In Progress', priority:'High', due:'2026-08-10' },
+        { id:'t4', title:'Write API docs', desc:'', project:'p3', assignee:'m1', status:'To Do', priority:'Low', due:'2026-08-15' },
+        { id:'t5', title:'Database schema review', desc:'', project:'p3', assignee:'m2', status:'Review', priority:'Medium', due:'2026-08-05' },
+        { id:'t6', title:'User testing session', desc:'', project:'p2', assignee:'m4', status:'To Do', priority:'High', due:'2026-08-20' }
+      ],
+      members: [
+        { id:'m1', name:'Alice Johnson', role:'UI/UX Designer', email:'alice@example.com' },
+        { id:'m2', name:'Bob Smith', role:'DevOps Engineer', email:'bob@example.com' },
+        { id:'m3', name:'Carol Davis', role:'iOS Developer', email:'carol@example.com' },
+        { id:'m4', name:'Dan Wilson', role:'QA Lead', email:'dan@example.com' }
+      ]
+    };
+
+    function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+    function genId(prefix) { return prefix + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,5); }
+
+    // Navigation
+    document.querySelectorAll('.sidebar nav a').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        document.querySelectorAll('.sidebar nav a').forEach(x => x.classList.remove('active'));
+        a.classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(a.dataset.page).classList.add('active');
+        render();
+      });
+    });
+
+    // Modals
+    function openModal(id) { document.getElementById(id).classList.add('active'); populateSelects(); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+      m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
+    });
+
+    function populateSelects() {
+      const ps = document.getElementById('tProject');
+      const ms = document.getElementById('tAssignee');
+      ps.innerHTML = data.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      ms.innerHTML = data.member ? data.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('') : '';
+    }
+
+    // CRUD
+    function addProject() {
+      const name = document.getElementById('pName').value.trim();
+      if (!name) return;
+      data.projects.push({ id: genId('p'), name, desc: document.getElementById('pDesc').value.trim(), start: document.getElementById('pStart').value, end: document.getElementById('pEnd').value });
+      save(); closeModal('projectModal'); render();
+      ['pName','pDesc','pStart','pEnd'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    function addTask() {
+      const title = document.getElementById('tTitle').value.trim();
+      if (!title) return;
+      data.tasks.push({ id: genId('t'), title, desc: document.getElementById('tDesc').value.trim(), project: document.getElementById('tProject').value, assignee: document.getElementById('tAssignee').value, status: 'To Do', priority: document.getElementById('tPriority').value, due: document.getElementById('tDue').value });
+      save(); closeModal('taskModal'); render();
+      ['tTitle','tDesc','tDue'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    function addMember() {
+      const name = document.getElementById('mName').value.trim();
+      if (!name) return;
+      data.members.push({ id: genId('m'), name, role: document.getElementById('mRole').value.trim(), email: document.getElementById('mEmail').value.trim() });
+      save(); closeModal('memberModal'); render();
+      ['mName','mRole','mEmail'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    function deleteTask(id) {
+      data.tasks = data.tasks.filter(t => t.id !== id);
+      save(); render();
+    }
+
+    function moveTask(id, status) {
+      const t = data.tasks.find(x => x.id === id);
+      if (t) { t.status = status; save(); render(); }
+    }
+
+    function getMemberName(id) { const m = data.members.find(x => x.id === id); return m ? m.name : 'Unassigned'; }
+    function getProjectName(id) { const p = data.projects.find(x => x.id === id); return p ? p.name : '—'; }
+    function getMemberIndex(id) { return data.members.findIndex(x => x.id === id); }
+
+    // Render
+    function render() {
+      const statuses = ['To Do','In Progress','Review','Done'];
+      const total = data.tasks.length;
+      const done = data.tasks.filter(t => t.status === 'Done').length;
+      const inProg = data.tasks.filter(t => t.status === 'In Progress').length;
+      const high = data.tasks.filter(t => t.priority === 'High').length;
+      const overdue = data.tasks.filter(t => t.due && new Date(t.due) < new Date() && t.status !== 'Done').length;
+
+      document.getElementById('dashStats').innerHTML = `
+        <div class="stat-card"><div class="label">Total Tasks</div><div class="value blue">${total}</div></div>
+        <div class="stat-card"><div class="label">Completed</div><div class="value green">${done}</div></div>
+        <div class="stat-card"><div class="label">In Progress</div><div class="value yellow">${inProg}</div></div>
+        <div class="stat-card"><div class="label">High Priority</div><div class="value red">${high}</div></div>
+        <div class="stat-card"><div class="label">Overdue</div><div class="value purple">${overdue}</div></div>
+      `;
+
+      document.getElementById('recentTasks').innerHTML = data.tasks.slice(0,5).map(t => `<tr>
+        <td>${t.title}</td><td>${getProjectName(t.project)}</td><td>${getMemberName(t.assignee)}</td>
+        <td><span class="badge badge-${t.status==='To Do'?'todo':t.status==='In Progress'?'progress':t.status==='Review'?'review':'done'}">${t.status}</span></td>
+        <td><span class="badge badge-${t.priority.toLowerCase()}">${t.priority}</span></td>
+      </tr>`).join('');
+
+      document.getElementById('taskTable').innerHTML = data.tasks.map(t => `<tr>
+        <td>${t.title}</td><td>${getProjectName(t.project)}</td><td>${getMemberName(t.assignee)}</td>
+        <td><span class="badge badge-${t.status==='To Do'?'todo':t.status==='In Progress'?'progress':t.status==='Review'?'review':'done'}">${t.status}</span></td>
+        <td><span class="badge badge-${t.priority.toLowerCase()}">${t.priority}</span></td>
+        <td>${t.due || '—'}</td>
+        <td><button class="btn btn-sm btn-ghost" onclick="deleteTask('${t.id}')">Del</button></td>
+      </tr>`).join('');
+
+      document.getElementById('projectList').innerHTML = data.projects.map((p, i) => {
+        const pt = data.tasks.filter(t => t.project === p.id);
+        const pd = pt.length ? Math.round(pt.filter(t => t.status === 'Done').length / pt.length * 100) : 0;
+        return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:start"><div><h3>${p.name}</h3><p style="color:var(--text2);font-size:13px;margin-top:4px">${p.desc || ''}</p><p style="color:var(--text2);font-size:12px;margin-top:8px">${p.start || '?'} → ${p.end || '?'}</p></div><span class="badge badge-done">${pd}%</span></div><div class="progress-bar"><div class="fill" style="width:${pd}%;background:${color(i)}"></div></div><p style="font-size:12px;color:var(--text2);margin-top:8px">${pt.length} tasks</p></div>`;
+      }).join('');
+
+      document.getElementById('kanbanBoard').innerHTML = statuses.map(s => {
+        const tasks = data.tasks.filter(t => t.status === s);
+        return `<div class="kanban-col"><h3>${s} <span>${tasks.length}</span></h3>${tasks.map(t => `<div class="task-card" draggable="true" ondragstart="event.dataTransfer.setData('text','${t.id}')" ondragover="event.preventDefault()" ondrop="event.preventDefault();moveTask('${t.id}','${s}')"><div class="title">${t.title}</div><div class="meta"><span>${getMemberName(t.assignee)}</span><span class="badge badge-${t.priority.toLowerCase()}" style="font-size:10px">${t.priority}</span></div></div>`).join('')}</div>`;
+      }).join('');
+
+      document.getElementById('teamGrid').innerHTML = data.members.map((m, i) => `<div class="card team-card"><div class="avatar" style="background:${color(i)};min-width:48px;height:48px;font-size:18px">${m.name.split(' ').map(n=>n[0]).join('')}</div><div class="info"><h4>${m.name}</h4><p>${m.role}</p><p style="font-size:12px;color:var(--text2)">${m.email}</p></div></div>`).join('');
+    }
+
+    render();
+
+    // API sync (Vercel serverless)
+    async function syncWithAPI() {
+      try {
+        const res = await fetch('/api/server');
+        if (res.ok) { const serverData = await res.json(); if (serverData.data) { Object.assign(data, serverData.data); save(); render(); } }
+      } catch(e) { /* offline mode — localStorage is primary */ }
+    }
+    syncWithAPI();
+  </script>
+</body>
+</html>
