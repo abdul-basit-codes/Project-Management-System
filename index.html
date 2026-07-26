@@ -92,6 +92,8 @@
         <a href="#" data-page="projects">Projects</a>
         <a href="#" data-page="tasks">Tasks</a>
         <a href="#" data-page="kanban">Kanban Board</a>
+        <a href="#" data-page="gantt">Gantt Chart</a>
+        <a href="#" data-page="timelog">Time Log</a>
         <a href="#" data-page="team">Team</a>
       </nav>
     </aside>
@@ -119,6 +121,16 @@
       <div id="kanban" class="page">
         <div class="header"><h2>Kanban Board</h2></div>
         <div class="kanban" id="kanbanBoard"></div>
+      </div>
+      <!-- Gantt Chart -->
+      <div id="gantt" class="page">
+        <div class="header"><h2>Gantt Chart</h2></div>
+        <div id="ganttContainer" style="overflow-x:auto;"></div>
+      </div>
+      <!-- Time Log -->
+      <div id="timelog" class="page">
+        <div class="header"><h2>Time Log</h2><button class="btn btn-primary" onclick="openModal('timeModal')">+ Log Time</button></div>
+        <div class="card"><table><thead><tr><th>Task</th><th>Member</th><th>Hours</th><th>Date</th><th>Notes</th></tr></thead><tbody id="timeLogTable"></tbody></table></div>
       </div>
       <!-- Team -->
       <div id="team" class="page">
@@ -155,6 +167,19 @@
         <div class="form-group"><label>Due Date</label><input type="date" id="tDue"></div>
       </div>
       <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('taskModal')">Cancel</button><button class="btn btn-primary" onclick="addTask()">Create</button></div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="timeModal">
+    <div class="modal">
+      <h3>Log Time</h3>
+      <div class="form-group"><label>Task</label><select id="tlTask"></select></div>
+      <div class="form-group"><label>Member</label><select id="tlMember"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>Hours</label><input type="number" id="tlHours" min="0.5" step="0.5" placeholder="e.g. 2.5"></div>
+        <div class="form-group"><label>Date</label><input type="date" id="tlDate"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><input id="tlNotes" placeholder="What did you work on?"></div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('timeModal')">Cancel</button><button class="btn btn-primary" onclick="logTime()">Log</button></div>
     </div>
   </div>
   <div class="modal-overlay" id="memberModal">
@@ -305,7 +330,87 @@
       }).join('');
 
       document.getElementById('teamGrid').innerHTML = data.members.map((m, i) => `<div class="card team-card"><div class="avatar" style="background:${color(i)};min-width:48px;height:48px;font-size:18px">${m.name.split(' ').map(n=>n[0]).join('')}</div><div class="info"><h4>${m.name}</h4><p>${m.role}</p><p style="font-size:12px;color:var(--text2)">${m.email}</p></div></div>`).join('');
+
+      // Gantt Chart
+      renderGantt();
+      // Time Log
+      renderTimeLog();
     }
+
+    // ── Gantt Chart ──
+    function renderGantt() {
+      const container = document.getElementById('ganttContainer');
+      const tasks = data.tasks.filter(t => t.due);
+      if (!tasks.length) { container.innerHTML = '<p style="color:var(--text2);">No tasks with due dates to display.</p>'; return; }
+
+      const allDates = tasks.map(t => new Date(t.due));
+      const minDate = new Date(Math.min(...allDates));
+      minDate.setDate(minDate.getDate() - 7);
+      const maxDate = new Date(Math.max(...allDates));
+      maxDate.setDate(maxDate.getDate() + 7);
+      const totalDays = Math.ceil((maxDate - minDate) / (1000*60*60*24));
+
+      const barColors = { 'To Do': 'var(--text2)', 'In Progress': 'var(--warning)', 'Review': 'var(--purple)', 'Done': 'var(--success)' };
+
+      let html = '<div style="min-width:600px;">';
+      html += '<div style="display:flex;margin-bottom:8px;padding-left:180px;">';
+      for (let i = 0; i <= Math.min(totalDays, 60); i += 7) {
+        const d = new Date(minDate); d.setDate(d.getDate() + i);
+        html += '<div style="flex:1;text-align:center;font-size:10px;color:var(--text2);">' + (d.getMonth()+1) + '/' + d.getDate() + '</div>';
+      }
+      html += '</div>';
+
+      tasks.forEach(t => {
+        const due = new Date(t.due);
+        const offset = Math.max(0, Math.ceil((due - 14*86400000 - minDate) / 86400000));
+        const barWidth = Math.max(5, Math.min(100 - offset, 15));
+        html += '<div style="display:flex;align-items:center;margin-bottom:4px;">';
+        html += '<div style="width:180px;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px;">' + t.title + '</div>';
+        html += '<div style="flex:1;height:20px;background:var(--surface2);border-radius:4px;position:relative;">';
+        html += '<div style="position:absolute;left:' + offset + '%;width:' + barWidth + '%;height:100%;background:' + barColors[t.status] + ';border-radius:4px;opacity:0.8;"></div>';
+        html += '</div></div>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    // ── Time Log ──
+    let timeLogs = [];
+
+    function renderTimeLog() {
+      const table = document.getElementById('timeLogTable');
+      if (!timeLogs.length) { table.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No time logged yet.</td></tr>'; return; }
+      table.innerHTML = timeLogs.map(l => '<tr><td>' + (data.tasks.find(t=>t.id===l.taskId)?.title||l.taskId) + '</td><td>' + getMemberName(l.memberId) + '</td><td>' + l.hours + 'h</td><td>' + l.date + '</td><td>' + (l.notes||'-') + '</td></tr>').join('');
+    }
+
+    window.openModal = (function(orig) {
+      return function(id) {
+        if (id === 'timeModal') {
+          const taskSel = document.getElementById('tlTask');
+          const memSel = document.getElementById('tlMember');
+          taskSel.innerHTML = data.tasks.map(t => '<option value="' + t.id + '">' + t.title + '</option>').join('');
+          memSel.innerHTML = data.members.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
+          document.getElementById('tlDate').value = new Date().toISOString().slice(0,10);
+        }
+        document.getElementById(id).classList.add('active');
+      };
+    })(window.openModal);
+
+    window.logTime = function() {
+      const taskId = document.getElementById('tlTask').value;
+      const memberId = document.getElementById('tlMember').value;
+      const hours = parseFloat(document.getElementById('tlHours').value);
+      const date = document.getElementById('tlDate').value;
+      const notes = document.getElementById('tlNotes').value;
+      if (!taskId || !memberId || !hours) { alert('Please fill all required fields'); return; }
+      timeLogs.push({ taskId, memberId, hours, date, notes });
+      localStorage.setItem('timeLogs', JSON.stringify(timeLogs));
+      closeModal('timeModal');
+      renderTimeLog();
+    };
+
+    const storedLogs = localStorage.getItem('timeLogs');
+    if (storedLogs) timeLogs = JSON.parse(storedLogs);
 
     render();
 
