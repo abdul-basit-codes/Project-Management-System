@@ -58,6 +58,8 @@
     .badge-low { background: rgba(34,197,94,0.15); color: var(--success); }
     .badge-medium { background: rgba(245,158,11,0.15); color: var(--warning); }
     .badge-high { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .tag-badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;margin:2px;background:var(--surface2);color:var(--text2);border:1px solid var(--border); }
+    .tag-filter { display:inline-flex;gap:6px;margin-bottom:12px;flex-wrap:wrap; }
     .kanban { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     .kanban-col { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-height: 400px; }
     .kanban-col h3 { font-size: 14px; color: var(--text2); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
@@ -118,7 +120,8 @@
       <!-- Tasks -->
       <div id="tasks" class="page">
         <div class="header"><h2>Tasks</h2><button class="btn btn-primary" onclick="openModal('taskModal')">+ New Task</button></div>
-        <div class="card"><table><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due</th><th>Actions</th></tr></thead><tbody id="taskTable"></tbody></table></div>
+        <div class="tag-filter" id="tagFilterBar"></div>
+        <div class="card"><table><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Tags</th><th>Due</th><th>Actions</th></tr></thead><tbody id="taskTable"></tbody></table></div>
       </div>
       <!-- Kanban -->
       <div id="kanban" class="page">
@@ -184,6 +187,9 @@
       </div>
       <div class="form-row">
         <div class="form-group"><label>Priority</label><select id="tPriority"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
+        <div class="form-group"><label>Tags</label><input id="tTags" placeholder="e.g. frontend, bug, urgent"></div>
+      </div>
+      <div class="form-row">
         <div class="form-group"><label>Due Date</label><input type="date" id="tDue"></div>
       </div>
       <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('taskModal')">Cancel</button><button class="btn btn-primary" onclick="addTask()">Create</button></div>
@@ -230,6 +236,7 @@
     let data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {
       projects: [
         { id: 'p1', name: 'Website Redesign', desc: 'Modernize the company website', start: '2026-07-01', end: '2026-08-15' },
+        { id: 'p1', name: 'Website Redesign', desc: 'Modernize the company website', start: '2026-07-01', end: '2026-08-15' },
         { id: 'p2', name: 'Mobile App v2', desc: 'iOS and Android release', start: '2026-07-10', end: '2026-09-30' },
         { id: 'p3', name: 'API Migration', desc: 'Move to REST v3', start: '2026-07-20', end: '2026-08-30' }
       ],
@@ -251,6 +258,7 @@
 
     function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
     function genId(prefix) { return prefix + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,5); }
+    let activeTagFilter = '';
 
     // Navigation
     document.querySelectorAll('.sidebar nav a').forEach(a => {
@@ -290,9 +298,11 @@
     function addTask() {
       const title = document.getElementById('tTitle').value.trim();
       if (!title) return;
-      data.tasks.push({ id: genId('t'), title, desc: document.getElementById('tDesc').value.trim(), project: document.getElementById('tProject').value, assignee: document.getElementById('tAssignee').value, status: 'To Do', priority: document.getElementById('tPriority').value, due: document.getElementById('tDue').value });
+      const tagsRaw = document.getElementById('tTags').value.trim();
+      const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+      data.tasks.push({ id: genId('t'), title, desc: document.getElementById('tDesc').value.trim(), project: document.getElementById('tProject').value, assignee: document.getElementById('tAssignee').value, status: 'To Do', priority: document.getElementById('tPriority').value, tags, due: document.getElementById('tDue').value });
       save(); closeModal('taskModal'); render();
-      ['tTitle','tDesc','tDue'].forEach(id => document.getElementById(id).value = '');
+      ['tTitle','tDesc','tDue','tTags'].forEach(id => document.getElementById(id).value = '');
     }
 
     function addMember() {
@@ -317,6 +327,21 @@
     function getProjectName(id) { const p = data.projects.find(x => x.id === id); return p ? p.name : '—'; }
     function getMemberIndex(id) { return data.members.findIndex(x => x.id === id); }
 
+    function renderTags(tags) {
+      return tags && tags.length ? tags.map(t => '<span class="tag-badge">' + t + '</span>').join('') : '';
+    }
+
+    function getAllTags() {
+      const tagSet = new Set();
+      data.tasks.forEach(t => { if (t.tags) t.tags.forEach(tag => tagSet.add(tag)); });
+      return [...tagSet].sort();
+    }
+
+    window.filterByTag = function(tag) {
+      activeTagFilter = activeTagFilter === tag ? '' : tag;
+      render();
+    };
+
     // Render
     function render() {
       const statuses = ['To Do','In Progress','Review','Done'];
@@ -340,10 +365,19 @@
         <td><span class="badge badge-${t.priority.toLowerCase()}">${t.priority}</span></td>
       </tr>`).join('');
 
-      document.getElementById('taskTable').innerHTML = data.tasks.map(t => `<tr>
+      // Tag filter bar
+      const allTags = getAllTags();
+      document.getElementById('tagFilterBar').innerHTML = '<button class="btn btn-sm ' + (!activeTagFilter ? 'btn-primary' : 'btn-ghost') + '" onclick="activeTagFilter=\'\';render();">All</button>' +
+        allTags.map(tag => '<button class="btn btn-sm ' + (activeTagFilter === tag ? 'btn-primary' : 'btn-ghost') + '" onclick="filterByTag(\'' + tag + '\')">' + tag + '</button>').join('');
+
+      // Filter tasks by active tag
+      const filteredTasks = activeTagFilter ? data.tasks.filter(t => t.tags && t.tags.includes(activeTagFilter)) : data.tasks;
+
+      document.getElementById('taskTable').innerHTML = filteredTasks.map(t => `<tr>
         <td>${t.title}</td><td>${getProjectName(t.project)}</td><td>${getMemberName(t.assignee)}</td>
         <td><span class="badge badge-${t.status==='To Do'?'todo':t.status==='In Progress'?'progress':t.status==='Review'?'review':'done'}">${t.status}</span></td>
         <td><span class="badge badge-${t.priority.toLowerCase()}">${t.priority}</span></td>
+        <td>${renderTags(t.tags)}</td>
         <td>${t.due || '—'}</td>
         <td><button class="btn btn-sm btn-ghost" onclick="deleteTask('${t.id}')">Del</button></td>
       </tr>`).join('');
@@ -356,7 +390,7 @@
 
       document.getElementById('kanbanBoard').innerHTML = statuses.map(s => {
         const tasks = data.tasks.filter(t => t.status === s);
-        return `<div class="kanban-col"><h3>${s} <span>${tasks.length}</span></h3>${tasks.map(t => `<div class="task-card" draggable="true" ondragstart="event.dataTransfer.setData('text','${t.id}')" ondragover="event.preventDefault()" ondrop="event.preventDefault();moveTask('${t.id}','${s}')"><div class="title">${t.title}</div><div class="meta"><span>${getMemberName(t.assignee)}</span><span class="badge badge-${t.priority.toLowerCase()}" style="font-size:10px">${t.priority}</span></div></div>`).join('')}</div>`;
+        return `<div class="kanban-col"><h3>${s} <span>${tasks.length}</span></h3>${tasks.map(t => `<div class="task-card" draggable="true" ondragstart="event.dataTransfer.setData('text','${t.id}')" ondragover="event.preventDefault()" ondrop="event.preventDefault();moveTask('${t.id}','${s}')"><div class="title">${t.title}</div><div class="meta"><span>${getMemberName(t.assignee)}</span><span class="badge badge-${t.priority.toLowerCase()}" style="font-size:10px">${t.priority}</span></div>${t.tags && t.tags.length ? '<div style="margin-top:6px;">' + t.tags.map(tag => '<span class="tag-badge" style="font-size:10px;">' + tag + '</span>').join('') + '</div>' : ''}</div>`).join('')}</div>`;
       }).join('');
 
       document.getElementById('teamGrid').innerHTML = data.members.map((m, i) => `<div class="card team-card"><div class="avatar" style="background:${color(i)};min-width:48px;height:48px;font-size:18px">${m.name.split(' ').map(n=>n[0]).join('')}</div><div class="info"><h4>${m.name}</h4><p>${m.role}</p><p style="font-size:12px;color:var(--text2)">${m.email}</p></div></div>`).join('');
