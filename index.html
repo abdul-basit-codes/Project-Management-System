@@ -96,6 +96,8 @@
         <a href="#" data-page="timelog">Time Log</a>
         <a href="#" data-page="milestones">Milestones</a>
         <a href="#" data-page="team">Team</a>
+        <a href="#" data-page="reports">Reports</a>
+        <a href="#" data-page="activity">Activity</a>
       </nav>
     </aside>
     <main class="main">
@@ -142,6 +144,18 @@
       <div id="team" class="page">
         <div class="header"><h2>Team</h2><button class="btn btn-primary" onclick="openModal('memberModal')">+ Add Member</button></div>
         <div class="team-grid" id="teamGrid"></div>
+      </div>
+      <!-- Reports -->
+      <div id="reports" class="page">
+        <div class="header"><h2>Reports</h2></div>
+        <div class="card" id="reportOverview"></div>
+        <div class="card" id="reportMemberLoad"></div>
+        <div class="card" id="reportTimeUtil"></div>
+      </div>
+      <!-- Activity Log -->
+      <div id="activity" class="page">
+        <div class="header"><h2>Activity Log</h2><button class="btn btn-ghost" onclick="clearActivity()">Clear</button></div>
+        <div class="card" id="activityFeed"></div>
       </div>
     </main>
   </div>
@@ -351,6 +365,8 @@
       renderGantt();
       // Time Log
       renderTimeLog();
+      renderReports();
+      renderActivity();
     }
 
     // ── Gantt Chart ──
@@ -443,6 +459,102 @@
         return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:start;"><div><h3 style="margin-bottom:4px;">' + m.name + '</h3><p style="font-size:12px;color:var(--text2);">' + (proj ? proj.name : 'No project') + '</p></div><span class="badge badge-' + (m.status==='Achieved'?'done':m.status==='In Progress'?'progress':'todo') + '">' + m.status + '</span></div><p style="font-size:13px;color:var(--text2);margin:8px 0;">' + (m.desc || '') + '</p><p style="font-size:12px;color:var(--text2);">Due: ' + (m.date || 'Not set') + '</p><div class="progress-bar" style="margin-top:8px;"><div class="fill" style="width:' + (relatedTasks.length ? Math.round(completed/relatedTasks.length*100) : 0) + '%;background:var(--primary);"></div></div><p style="font-size:11px;color:var(--text2);margin-top:4px;">' + completed + '/' + relatedTasks.length + ' tasks</p></div>';
       }).join('');
     }
+
+    // ── Reports ──
+    function renderReports() {
+      const overview = document.getElementById('reportOverview');
+      const memberLoad = document.getElementById('reportMemberLoad');
+      const timeUtil = document.getElementById('reportTimeUtil');
+
+      const total = data.tasks.length;
+      const done = data.tasks.filter(t => t.status === 'Done').length;
+      const inProg = data.tasks.filter(t => t.status === 'In Progress').length;
+      const review = data.tasks.filter(t => t.status === 'Review').length;
+      const todo = data.tasks.filter(t => t.status === 'To Do').length;
+      const overdue = data.tasks.filter(t => t.due && new Date(t.due) < new Date() && t.status !== 'Done').length;
+      const completion = total ? Math.round(done / total * 100) : 0;
+
+      overview.innerHTML = '<h3>Project Overview</h3>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:12px;">' +
+        '<div class="stat-card"><div class="label">Total Tasks</div><div class="value blue">' + total + '</div></div>' +
+        '<div class="stat-card"><div class="label">Completed</div><div class="value green">' + done + '</div></div>' +
+        '<div class="stat-card"><div class="label">In Progress</div><div class="value yellow">' + inProg + '</div></div>' +
+        '<div class="stat-card"><div class="label">Review</div><div class="value purple">' + review + '</div></div>' +
+        '<div class="stat-card"><div class="label">To Do</div><div class="value red">' + todo + '</div></div>' +
+        '<div class="stat-card"><div class="label">Overdue</div><div class="value orange">' + overdue + '</div></div>' +
+        '<div class="stat-card"><div class="label">Completion</div><div class="value green">' + completion + '%</div></div>' +
+        '</div>' +
+        '<div class="progress-bar" style="margin-top:16px;"><div class="fill" style="width:' + completion + '%;background:var(--primary);"></div></div>';
+
+      // Member workload
+      memberLoad.innerHTML = '<h3>Member Workload</h3><table style="margin-top:12px;"><thead><tr><th>Member</th><th>Active Tasks</th><th>Completed</th><th>Load</th></tr></thead><tbody>' +
+        data.members.map(m => {
+          const active = data.tasks.filter(t => t.assignee === m.id && t.status !== 'Done').length;
+          const completed = data.tasks.filter(t => t.assignee === m.id && t.status === 'Done').length;
+          const load = (active + completed) > 0 ? Math.round(active / (active + completed) * 100) : 0;
+          const color = load > 70 ? 'var(--danger)' : load > 40 ? 'var(--warning)' : 'var(--success)';
+          return '<tr><td>' + m.name + '</td><td>' + active + '</td><td>' + completed + '</td><td><span style="color:' + color + ';font-weight:600;">' + load + '%</span></td></tr>';
+        }).join('') +
+        '</tbody></table>';
+
+      // Time utilization
+      const timeLogs = JSON.parse(localStorage.getItem('timeLogs') || '[]');
+      const totalHours = timeLogs.reduce((s, t) => s + (parseFloat(t.hours) || 0), 0);
+      const avgHoursPerTask = total && totalHours ? (totalHours / total).toFixed(1) : '0.0';
+      timeUtil.innerHTML = '<h3>Time Utilization</h3>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:12px;">' +
+        '<div class="stat-card"><div class="label">Total Hours Logged</div><div class="value blue">' + totalHours.toFixed(1) + '</div></div>' +
+        '<div class="stat-card"><div class="label">Avg Hours / Task</div><div class="value green">' + avgHoursPerTask + '</div></div>' +
+        '<div class="stat-card"><div class="label">Time Entries</div><div class="value yellow">' + timeLogs.length + '</div></div>' +
+        '</div>';
+    }
+
+    // ── Activity Log ──
+    function getActivityLog() {
+      const stored = localStorage.getItem('activityLog');
+      return stored ? JSON.parse(stored) : [];
+    }
+
+    function saveActivityLog(log) {
+      localStorage.setItem('activityLog', JSON.stringify(log));
+    }
+
+    function logActivity(msg) {
+      const log = getActivityLog();
+      log.unshift({ msg, time: new Date().toLocaleString(), id: Date.now() });
+      if (log.length > 100) log.length = 100;
+      saveActivityLog(log);
+    }
+
+    function renderActivity() {
+      const container = document.getElementById('activityFeed');
+      const log = getActivityLog();
+      if (!log.length) { container.innerHTML = '<p style="color:var(--text2);text-align:center;padding:40px;">No activity recorded yet.</p>'; return; }
+      container.innerHTML = log.map(e => '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span>' + e.msg + '</span><span style="font-size:12px;color:var(--text2);">' + e.time + '</span></div>').join('');
+    }
+
+    window.clearActivity = function() {
+      localStorage.removeItem('activityLog');
+      renderActivity();
+    };
+
+    // Intercept CRUD to log activity
+    var origAddProject = addProject;
+    addProject = function() {
+      origAddProject();
+      logActivity('Created project: ' + (document.getElementById('pName').value.trim() || ''));
+    };
+    var origAddTask = addTask;
+    addTask = function() {
+      origAddTask();
+      logActivity('Created task: ' + (document.getElementById('tTitle').value.trim() || ''));
+    };
+    var origAddMember = (window.addMember || function(){});
+    window.addMember = function() {
+      if (origAddMember) origAddMember();
+      const nameInput = document.getElementById('mName');
+      if (nameInput) logActivity('Added member: ' + (nameInput.value.trim() || ''));
+    };
 
     window.openModal = (function(orig) {
       return function(id) {
