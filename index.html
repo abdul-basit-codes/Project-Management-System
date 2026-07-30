@@ -101,6 +101,7 @@
         <a href="#" data-page="reports">Reports</a>
         <a href="#" data-page="activity">Activity</a>
         <a href="#" data-page="notifications" style="position:relative;">Notifications <span id="notifBadge" style="background:var(--danger);color:#fff;border-radius:50%;padding:1px 6px;font-size:10px;position:absolute;right:10px;top:8px;display:none;"></span></a>
+        <a href="#" data-page="backup">Backup</a>
       </nav>
     </aside>
     <main class="main">
@@ -165,6 +166,21 @@
       <div id="notifications" class="page">
         <div class="header"><h2>Notifications</h2><button class="btn btn-ghost" onclick="clearNotifications()">Clear All</button></div>
         <div id="notifList"></div>
+      </div>
+      <!-- Export/Import -->
+      <div id="backup" class="page">
+        <div class="header"><h2>Backup & Restore</h2></div>
+        <div class="card">
+          <h3 style="margin-bottom:12px;">Export All Data</h3>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Download a JSON file with all projects, tasks, members, milestones, time logs, and activity.</p>
+          <button class="btn btn-primary" onclick="exportData()"><i class="fa-solid fa-download"></i> Export JSON</button>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:12px;">Import Data</h3>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Upload a previously exported JSON file to restore data. This will replace all current data.</p>
+          <input type="file" id="importFile" accept=".json" style="margin-bottom:12px;color:var(--text);">
+          <button class="btn btn-warning" onclick="importData()">Import & Replace</button>
+        </div>
       </div>
     </main>
   </div>
@@ -683,6 +699,52 @@
     })(window.openModal);
 
     render();
+
+    // ── Export / Import ──
+    window.exportData = function() {
+      const exportObj = {
+        projects: data.projects,
+        tasks: data.tasks,
+        members: data.members,
+        milestones: JSON.parse(localStorage.getItem('milestones') || '[]'),
+        timeLogs: JSON.parse(localStorage.getItem('timeLogs') || '[]'),
+        activityLog: JSON.parse(localStorage.getItem('activityLog') || '[]'),
+        notifications: JSON.parse(localStorage.getItem('notifications') || '[]'),
+        exportedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'projecthub-backup-' + new Date().toISOString().slice(0,10) + '.json';
+      a.click();
+      addNotification('Data exported successfully', 'success');
+    };
+
+    window.importData = function() {
+      const fileInput = document.getElementById('importFile');
+      if (!fileInput.files || !fileInput.files[0]) { alert('Please select a JSON file.'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (!imported.projects || !imported.tasks || !imported.members) { alert('Invalid backup file.'); return; }
+          data.projects = imported.projects;
+          data.tasks = imported.tasks;
+          data.members = imported.members;
+          save();
+          if (imported.milestones) localStorage.setItem('milestones', JSON.stringify(imported.milestones));
+          if (imported.timeLogs) localStorage.setItem('timeLogs', JSON.stringify(imported.timeLogs));
+          if (imported.activityLog) localStorage.setItem('activityLog', JSON.stringify(imported.activityLog));
+          if (imported.notifications) localStorage.setItem('notifications', JSON.stringify(imported.notifications));
+          timeLogs = JSON.parse(localStorage.getItem('timeLogs') || '[]');
+          milestones = JSON.parse(localStorage.getItem('milestones') || '[]');
+          addNotification('Data imported successfully', 'success');
+          render();
+          alert('Data imported successfully.');
+        } catch(err) { alert('Error importing file: ' + err.message); }
+      };
+      reader.readAsText(fileInput.files[0]);
+    };
 
     // API sync (Vercel serverless)
     async function syncWithAPI() {
