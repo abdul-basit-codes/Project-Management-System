@@ -100,6 +100,7 @@
         <a href="#" data-page="team">Team</a>
         <a href="#" data-page="reports">Reports</a>
         <a href="#" data-page="activity">Activity</a>
+        <a href="#" data-page="notifications" style="position:relative;">Notifications <span id="notifBadge" style="background:var(--danger);color:#fff;border-radius:50%;padding:1px 6px;font-size:10px;position:absolute;right:10px;top:8px;display:none;"></span></a>
       </nav>
     </aside>
     <main class="main">
@@ -159,6 +160,11 @@
       <div id="activity" class="page">
         <div class="header"><h2>Activity Log</h2><button class="btn btn-ghost" onclick="clearActivity()">Clear</button></div>
         <div class="card" id="activityFeed"></div>
+      </div>
+      <!-- Notifications -->
+      <div id="notifications" class="page">
+        <div class="header"><h2>Notifications</h2><button class="btn btn-ghost" onclick="clearNotifications()">Clear All</button></div>
+        <div id="notifList"></div>
       </div>
     </main>
   </div>
@@ -269,6 +275,13 @@
         a.classList.add('active');
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(a.dataset.page).classList.add('active');
+        if (a.dataset.page === 'notifications') {
+          let notifs = getNotifications();
+          notifs.forEach(n => n.read = true);
+          saveNotifications(notifs);
+          updateNotifBadge();
+          renderNotifications();
+        }
         render();
       });
     });
@@ -579,6 +592,59 @@
       localStorage.removeItem('activityLog');
       renderActivity();
     };
+
+    // ── Notifications ──
+    function getNotifications() {
+      const stored = localStorage.getItem('notifications');
+      return stored ? JSON.parse(stored) : [];
+    }
+    function saveNotifications(n) { localStorage.setItem('notifications', JSON.stringify(n)); }
+    function addNotification(msg, type) {
+      const notifs = getNotifications();
+      notifs.unshift({ msg, time: new Date().toLocaleString(), type: type || 'info', read: false, id: Date.now() });
+      if (notifs.length > 50) notifs.length = 50;
+      saveNotifications(notifs);
+      updateNotifBadge();
+    }
+    window.clearNotifications = function() { localStorage.removeItem('notifications'); renderNotifications(); updateNotifBadge(); };
+    function updateNotifBadge() {
+      const unread = getNotifications().filter(n => !n.read).length;
+      const badge = document.getElementById('notifBadge');
+      if (badge) { badge.textContent = unread; badge.style.display = unread ? 'inline' : 'none'; }
+    }
+    function renderNotifications() {
+      const container = document.getElementById('notifList');
+      if (!container) return;
+      const notifs = getNotifications();
+      if (!notifs.length) { container.innerHTML = '<div class="card" style="text-align:center;color:var(--text2);padding:40px;">No notifications.</div>'; return; }
+      container.innerHTML = notifs.map(n => {
+        const colors = { overdue: 'var(--danger)', info: 'var(--primary)', warning: 'var(--warning)', success: 'var(--success)' };
+        return '<div class="card" style="border-left:4px solid ' + (colors[n.type] || 'var(--primary)') + ';' + (n.read ? 'opacity:0.7;' : '') + '"><div style="display:flex;justify-content:space-between;align-items:center;"><span>' + n.msg + '</span><span style="font-size:12px;color:var(--text2);display:flex;gap:8px;align-items:center;">' + n.time + '<button class="btn btn-sm btn-ghost" onclick="dismissNotif(' + n.id + ')" style="padding:2px 6px;font-size:10px;">✕</button></span></div></div>';
+      }).join('');
+    }
+    window.dismissNotif = function(id) {
+      let notifs = getNotifications();
+      notifs = notifs.filter(n => n.id !== id);
+      saveNotifications(notifs);
+      renderNotifications();
+      updateNotifBadge();
+    };
+
+    // Generate notifications from overdue tasks
+    function checkOverdueTasks() {
+      const today = new Date();
+      data.tasks.forEach(t => {
+        if (t.due && t.status !== 'Done' && new Date(t.due) < today) {
+          const notifs = getNotifications();
+          const key = 'overdue_' + t.id;
+          if (!notifs.some(n => n.msg.includes(key))) {
+            addNotification('⚠️ [' + key + '] Task "' + t.title + '" is overdue!', 'overdue');
+          }
+        }
+      });
+    }
+    checkOverdueTasks();
+    setInterval(checkOverdueTasks, 300000); // every 5 min
 
     // Intercept CRUD to log activity
     var origAddProject = addProject;
