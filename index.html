@@ -121,7 +121,7 @@
       <div id="tasks" class="page">
         <div class="header"><h2>Tasks</h2><button class="btn btn-primary" onclick="openModal('taskModal')">+ New Task</button></div>
         <div class="tag-filter" id="tagFilterBar"></div>
-        <div class="card"><table><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Tags</th><th>Due</th><th>Actions</th></tr></thead><tbody id="taskTable"></tbody></table></div>
+        <div class="card"><table><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Tags</th><th>Due</th><th>Depends On</th><th>Actions</th></tr></thead><tbody id="taskTable"></tbody></table></div>
       </div>
       <!-- Kanban -->
       <div id="kanban" class="page">
@@ -191,6 +191,7 @@
       </div>
       <div class="form-row">
         <div class="form-group"><label>Due Date</label><input type="date" id="tDue"></div>
+        <div class="form-group"><label>Depends On</label><select id="tDepends"><option value="">None</option></select></div>
       </div>
       <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('taskModal')">Cancel</button><button class="btn btn-primary" onclick="addTask()">Create</button></div>
     </div>
@@ -284,6 +285,11 @@
       const ms = document.getElementById('tAssignee');
       ps.innerHTML = data.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
       ms.innerHTML = data.member ? data.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('') : '';
+      const dep = document.getElementById('tDepends');
+      if (dep) {
+        const others = data.tasks.filter(t => !t.id.startsWith('pending'));
+        dep.innerHTML = '<option value="">None</option>' + others.map(t => '<option value="' + t.id + '">' + t.title + '</option>').join('');
+      }
     }
 
     // CRUD
@@ -300,7 +306,8 @@
       if (!title) return;
       const tagsRaw = document.getElementById('tTags').value.trim();
       const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-      data.tasks.push({ id: genId('t'), title, desc: document.getElementById('tDesc').value.trim(), project: document.getElementById('tProject').value, assignee: document.getElementById('tAssignee').value, status: 'To Do', priority: document.getElementById('tPriority').value, tags, due: document.getElementById('tDue').value });
+      const dependsOn = document.getElementById('tDepends').value;
+      data.tasks.push({ id: genId('t'), title, desc: document.getElementById('tDesc').value.trim(), project: document.getElementById('tProject').value, assignee: document.getElementById('tAssignee').value, status: 'To Do', priority: document.getElementById('tPriority').value, tags, due: document.getElementById('tDue').value, dependsOn: dependsOn || '' });
       save(); closeModal('taskModal'); render();
       ['tTitle','tDesc','tDue','tTags'].forEach(id => document.getElementById(id).value = '');
     }
@@ -379,6 +386,7 @@
         <td><span class="badge badge-${t.priority.toLowerCase()}">${t.priority}</span></td>
         <td>${renderTags(t.tags)}</td>
         <td>${t.due || '—'}</td>
+        <td>${t.dependsOn ? '<span style="color:var(--warning);font-size:11px;">⤷ ' + (data.tasks.find(x=>x.id===t.dependsOn)?.title||'') + '</span>' : '—'}</td>
         <td><button class="btn btn-sm btn-ghost" onclick="deleteTask('${t.id}')">Del</button></td>
       </tr>`).join('');
 
