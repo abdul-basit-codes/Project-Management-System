@@ -123,7 +123,15 @@
       <div id="tasks" class="page">
         <div class="header"><h2>Tasks</h2><button class="btn btn-primary" onclick="openModal('taskModal')">+ New Task</button></div>
         <div class="tag-filter" id="tagFilterBar"></div>
-        <div class="card"><table><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Tags</th><th>Due</th><th>Depends On</th><th>Actions</th></tr></thead><tbody id="taskTable"></tbody></table></div>
+        <div class="card">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;">
+            <div class="form-group" style="margin-bottom:0;"><label>Project</label><select id="filterProject" onchange="render()"><option value="">All Projects</option></select></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Assignee</label><select id="filterAssignee" onchange="render()"><option value="">All Members</option></select></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Status</label><select id="filterStatus" onchange="render()"><option value="">All Statuses</option></select></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Priority</label><select id="filterPriority" onchange="render()"><option value="">All Priorities</option></select></div>
+          </div>
+          <table><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Tags</th><th>Due</th><th>Depends On</th><th>Actions</th></tr></thead><tbody id="taskTable"></tbody></table>
+        </div>
       </div>
       <!-- Kanban -->
       <div id="kanban" class="page">
@@ -406,8 +414,22 @@
       document.getElementById('tagFilterBar').innerHTML = '<button class="btn btn-sm ' + (!activeTagFilter ? 'btn-primary' : 'btn-ghost') + '" onclick="activeTagFilter=\'\';render();">All</button>' +
         allTags.map(tag => '<button class="btn btn-sm ' + (activeTagFilter === tag ? 'btn-primary' : 'btn-ghost') + '" onclick="filterByTag(\'' + tag + '\')">' + tag + '</button>').join('');
 
-      // Filter tasks by active tag
-      const filteredTasks = activeTagFilter ? data.tasks.filter(t => t.tags && t.tags.includes(activeTagFilter)) : data.tasks;
+      // Filter tasks by active tag + dropdown filters
+      const fp = document.getElementById('filterProject');
+      const fa = document.getElementById('filterAssignee');
+      const fs = document.getElementById('filterStatus');
+      const fpr = document.getElementById('filterPriority');
+      if (fp) {
+        fp.innerHTML = '<option value="">All Projects</option>' + data.projects.map(p => '<option value="' + p.id + '">' + p.name + '</option>').join('');
+        fa.innerHTML = '<option value="">All Members</option>' + data.members.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
+        fs.innerHTML = '<option value="">All Statuses</option>' + ['To Do','In Progress','Review','Done'].map(s => '<option value="' + s + '">' + s + '</option>').join('');
+        fpr.innerHTML = '<option value="">All Priorities</option>' + ['Low','Medium','High'].map(p => '<option value="' + p + '">' + p + '</option>').join('');
+      }
+      let filteredTasks = activeTagFilter ? data.tasks.filter(t => t.tags && t.tags.includes(activeTagFilter)) : data.tasks;
+      if (fp && fp.value) filteredTasks = filteredTasks.filter(t => t.project === fp.value);
+      if (fa && fa.value) filteredTasks = filteredTasks.filter(t => t.assignee === fa.value);
+      if (fs && fs.value) filteredTasks = filteredTasks.filter(t => t.status === fs.value);
+      if (fpr && fpr.value) filteredTasks = filteredTasks.filter(t => t.priority === fpr.value);
 
       document.getElementById('taskTable').innerHTML = filteredTasks.map(t => `<tr>
         <td>${t.title}</td><td>${getProjectName(t.project)}</td><td>${getMemberName(t.assignee)}</td>
