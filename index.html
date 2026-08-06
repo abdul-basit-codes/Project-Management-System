@@ -259,6 +259,14 @@
       <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('memberModal')">Cancel</button><button class="btn btn-primary" onclick="addMember()">Add</button></div>
     </div>
   </div>
+  <div class="modal-overlay" id="commentModal">
+    <div class="modal">
+      <h3 id="commentModalTitle">Task Comments</h3>
+      <div id="commentList" style="max-height:240px;overflow-y:auto;margin-bottom:12px;"></div>
+      <div class="form-group" style="margin-bottom:0;"><label>Add Comment</label><input id="commentInput" placeholder="Write a comment..." onkeydown="if(event.key==='Enter')addComment()"></div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('commentModal')">Close</button><button class="btn btn-primary" onclick="addComment()">Add</button></div>
+    </div>
+  </div>
 
   <script>
     const STORAGE_KEY = 'projecthub_data';
@@ -322,7 +330,7 @@
       const ps = document.getElementById('tProject');
       const ms = document.getElementById('tAssignee');
       ps.innerHTML = data.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-      ms.innerHTML = data.member ? data.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('') : '';
+      ms.innerHTML = data.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
       const dep = document.getElementById('tDepends');
       if (dep) {
         const others = data.tasks.filter(t => !t.id.startsWith('pending'));
@@ -362,6 +370,53 @@
       data.tasks = data.tasks.filter(t => t.id !== id);
       save(); render();
     }
+
+    // ── Task comments ──
+    let activeCommentTaskId = null;
+
+    window.openComments = function(id) {
+      activeCommentTaskId = id;
+      const t = data.tasks.find(x => x.id === id);
+      if (!t) return;
+      if (!t.comments) t.comments = [];
+      document.getElementById('commentModalTitle').textContent = 'Comments — ' + t.title;
+      renderCommentList();
+      document.getElementById('commentModal').classList.add('active');
+    };
+
+    function renderCommentList() {
+      const t = data.tasks.find(x => x.id === activeCommentTaskId);
+      const list = document.getElementById('commentList');
+      if (!t) { list.innerHTML = ''; return; }
+      if (!t.comments.length) { list.innerHTML = '<p style="color:var(--text2);font-size:13px;">No comments yet.</p>'; return; }
+      list.innerHTML = t.comments.map(c => '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:8px;"><div style="font-size:11px;color:var(--text2);margin-bottom:4px;">' + c.time + '</div><div style="font-size:13px;">' + c.text + '</div></div>').join('');
+    }
+
+    window.addComment = function() {
+      const input = document.getElementById('commentInput');
+      const text = input.value.trim();
+      const t = data.tasks.find(x => x.id === activeCommentTaskId);
+      if (!text || !t) return;
+      if (!t.comments) t.comments = [];
+      t.comments.push({ text, time: new Date().toLocaleString() });
+      input.value = '';
+      save();
+      renderCommentList();
+      render();
+      logActivity('Commented on task: ' + t.title);
+    };
+
+    // ── Task duplication ──
+    window.duplicateTask = function(id) {
+      const t = data.tasks.find(x => x.id === id);
+      if (!t) return;
+      const copy = Object.assign({}, t, { id: genId('t'), title: t.title + ' (copy)', comments: t.comments ? t.comments.slice() : [] });
+      data.tasks.push(copy);
+      save();
+      render();
+      logActivity('Duplicated task: ' + copy.title);
+      addNotification('Task duplicated: ' + copy.title, 'success');
+    };
 
     function moveTask(id, status) {
       const t = data.tasks.find(x => x.id === id);
@@ -439,7 +494,7 @@
         <td>${renderTags(t.tags)}</td>
         <td>${t.due || '—'}</td>
         <td>${t.dependsOn ? '<span style="color:var(--warning);font-size:11px;">⤷ ' + (data.tasks.find(x=>x.id===t.dependsOn)?.title||'') + '</span>' : '—'}</td>
-        <td><button class="btn btn-sm btn-ghost" onclick="deleteTask('${t.id}')">Del</button></td>
+        <td><button class="btn btn-sm btn-ghost" onclick="duplicateTask('${t.id}')">Copy</button> <button class="btn btn-sm btn-ghost" onclick="openComments('${t.id}')">💬 ${t.comments ? t.comments.length : 0}</button> <button class="btn btn-sm btn-ghost" onclick="deleteTask('${t.id}')">Del</button></td>
       </tr>`).join('');
 
       document.getElementById('projectList').innerHTML = data.projects.map((p, i) => {
@@ -450,7 +505,7 @@
 
       document.getElementById('kanbanBoard').innerHTML = statuses.map(s => {
         const tasks = data.tasks.filter(t => t.status === s);
-        return `<div class="kanban-col"><h3>${s} <span>${tasks.length}</span></h3>${tasks.map(t => `<div class="task-card" draggable="true" ondragstart="event.dataTransfer.setData('text','${t.id}')" ondragover="event.preventDefault()" ondrop="event.preventDefault();moveTask('${t.id}','${s}')"><div class="title">${t.title}</div><div class="meta"><span>${getMemberName(t.assignee)}</span><span class="badge badge-${t.priority.toLowerCase()}" style="font-size:10px">${t.priority}</span></div>${t.tags && t.tags.length ? '<div style="margin-top:6px;">' + t.tags.map(tag => '<span class="tag-badge" style="font-size:10px;">' + tag + '</span>').join('') + '</div>' : ''}</div>`).join('')}</div>`;
+        return `<div class="kanban-col"><h3>${s} <span>${tasks.length}</span></h3>${tasks.map(t => `<div class="task-card" draggable="true" ondragstart="event.dataTransfer.setData('text','${t.id}')" ondragover="event.preventDefault()" ondrop="event.preventDefault();moveTask('${t.id}','${s}')"><div class="title">${t.title}</div><div class="meta"><span>${getMemberName(t.assignee)}</span><span class="badge badge-${t.priority.toLowerCase()}" style="font-size:10px">${t.priority}</span></div>${t.tags && t.tags.length ? '<div style="margin-top:6px;">' + t.tags.map(tag => '<span class="tag-badge" style="font-size:10px;">' + tag + '</span>').join('') + '</div>' : ''}<div style="margin-top:8px;display:flex;gap:8px;"><button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();duplicateTask('${t.id}')" style="padding:2px 6px;font-size:10px;">Copy</button><button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();openComments('${t.id}')" style="padding:2px 6px;font-size:10px;">💬 ${t.comments ? t.comments.length : 0}</button></div></div>`).join('')}</div>`;
       }).join('');
 
       document.getElementById('teamGrid').innerHTML = data.members.map((m, i) => `<div class="card team-card"><div class="avatar" style="background:${color(i)};min-width:48px;height:48px;font-size:18px">${m.name.split(' ').map(n=>n[0]).join('')}</div><div class="info"><h4>${m.name}</h4><p>${m.role}</p><p style="font-size:12px;color:var(--text2)">${m.email}</p></div></div>`).join('');
