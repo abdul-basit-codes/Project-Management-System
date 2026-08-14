@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-08-14
+
+### Added
+- In-memory CRUD API for projects, tasks, and members (GET/POST/PUT/DELETE)
+- Seed data for projects, tasks, and team members
+- API endpoint documentation in README
+
+### Changed
+- Health endpoint reports version `1.1.0`
+
 ## [1.0.0] - 2026-07-24
 
 ### Added
