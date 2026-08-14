@@ -17,6 +17,27 @@ Full-stack project management system with task tracking, team management, and Ka
 - **Backend:** Node.js Vercel Serverless Function
 - **Deployment:** Vercel (Framework: "Other")
 
+## API
+
+The serverless endpoint (`/api/server`) exposes full CRUD for `projects`, `tasks`, and `members`:
+
+| Method | Route                            | Description              |
+|--------|----------------------------------|--------------------------|
+| GET    | /api/server                      | Health check + endpoints |
+| GET    | /api/projects                    | List projects            |
+| POST   | /api/projects                    | Create a project         |
+| GET    | /api/projects/:id                | Get one project          |
+| PUT    | /api/projects/:id                | Update a project         |
+| DELETE | /api/projects/:id                | Delete a project         |
+| GET    | /api/tasks                       | List tasks               |
+| POST   | /api/tasks                       | Create a task            |
+| PUT    | /api/tasks/:id                   | Update a task            |
+| DELETE | /api/tasks/:id                   | Delete a task            |
+| GET    | /api/members                     | List team members        |
+
+Data is held in memory and resets on cold start; the frontend keeps its own
+localStorage copy so it works offline too.
+
 ## Deployment
 
 1. Push to GitHub
