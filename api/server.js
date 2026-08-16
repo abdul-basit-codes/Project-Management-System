@@ -64,6 +64,24 @@ module.exports = (req, res) => {
   const isOne = () => segments.length === 2 && /^\d+$/.test(segments[1]);
   const id = () => Number(segments[1]);
 
+  // Dashboard summary counts
+  if (req.method === 'GET' && segments[0] === 'summary') {
+    const tasks = store.tasks;
+    const today = new Date().toISOString().slice(0, 10);
+    return send(res, 200, {
+      success: true,
+      data: {
+        projects: store.projects.length,
+        tasks: tasks.length,
+        members: store.members.length,
+        done: tasks.filter((t) => t.status === 'done').length,
+        inProgress: tasks.filter((t) => t.status === 'in-progress').length,
+        highPriority: tasks.filter((t) => t.priority === 'high').length,
+        overdue: tasks.filter((t) => t.status !== 'done' && t.due && t.due < today).length,
+      },
+    });
+  }
+
   const lists = {
     projects: () => store.projects,
     tasks: () => store.tasks,
