@@ -34,6 +34,16 @@ The serverless endpoint (`/api/server`) exposes full CRUD for `projects`, `tasks
 | PUT    | /api/tasks/:id                   | Update a task            |
 | DELETE | /api/tasks/:id                   | Delete a task            |
 | GET    | /api/members                     | List team members        |
+| GET    | /api/summary                     | Dashboard counts         |
+| GET    | /api/tasks/overdue               | Overdue tasks            |
+
+Example:
+
+```sh
+curl http://localhost:3000/api/summary
+curl http://localhost:3000/api/tasks/overdue
+curl -X POST http://localhost:3000/api/tasks -H "Content-Type: application/json" -d '{"projectId":1,"title":"Write tests","status":"todo"}'
+```
 
 Data is held in memory and resets on cold start; the frontend keeps its own
 localStorage copy so it works offline too.
