@@ -59,6 +59,15 @@ module.exports = (req, res) => {
     });
   }
 
+  // Tasks that are not done and past their due date
+  if (req.method === 'GET' && segments[0] === 'tasks' && segments[1] === 'overdue') {
+    const today = new Date().toISOString().slice(0, 10);
+    const overdue = store.tasks.filter(
+      (t) => t.status !== 'done' && t.due && t.due < today
+    );
+    return send(res, 200, { success: true, count: overdue.length, data: overdue });
+  }
+
   const collection = segments[0];
   const isView = () => (req.method === 'GET' && segments.length === 1);
   const isOne = () => segments.length === 2 && /^\d+$/.test(segments[1]);
