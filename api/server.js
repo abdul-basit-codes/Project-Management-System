@@ -68,6 +68,22 @@ module.exports = (req, res) => {
     return send(res, 200, { success: true, count: overdue.length, data: overdue });
   }
 
+  // Task search: GET /tasks/search?q=title  (filters by title/assignee/status)
+  if (req.method === 'GET' && segments[0] === 'tasks' && segments[1] === 'search') {
+    const params = new URLSearchParams((req.url || '').split('?')[1] || '');
+    const q = (params.get('q') || '').toLowerCase().trim();
+    const status = (params.get('status') || '').toLowerCase().trim();
+    const results = store.tasks.filter((t) => {
+      const matchQ = !q ||
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.assignee || '').toLowerCase().includes(q) ||
+        (t.status || '').toLowerCase().includes(q);
+      const matchStatus = !status || t.status === status;
+      return matchQ && matchStatus;
+    });
+    return send(res, 200, { success: true, count: results.length, data: results });
+  }
+
   const collection = segments[0];
   const isView = () => (req.method === 'GET' && segments.length === 1);
   const isOne = () => segments.length === 2 && /^\d+$/.test(segments[1]);
