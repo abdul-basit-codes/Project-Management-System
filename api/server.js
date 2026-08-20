@@ -155,7 +155,15 @@ module.exports = (req, res) => {
     if (index === -1) {
       return send(res, 404, { success: false, message: 'Not found' });
     }
-    list[index] = { ...list[index], ...(req.body || {}), id: id() };
+    const now = new Date().toISOString();
+    const previous = list[index];
+    list[index] = {
+      ...previous,
+      ...(req.body || {}),
+      id: id(),
+      updatedAt: now,
+      createdAt: previous.createdAt || now,
+    };
     return send(res, 200, { success: true, data: list[index] });
   }
 
