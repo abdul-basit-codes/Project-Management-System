@@ -134,6 +134,15 @@ module.exports = (req, res) => {
   // POST /api/:collection  (create)
   if (req.method === 'POST' && isView()) {
     const body = req.body || {};
+    if (collection === 'tasks' && !body.title) {
+      return send(res, 400, { success: false, message: 'title is required for tasks' });
+    }
+    if (collection === 'projects' && !body.name) {
+      return send(res, 400, { success: false, message: 'name is required for projects' });
+    }
+    if (collection === 'members' && !body.name) {
+      return send(res, 400, { success: false, message: 'name is required for members' });
+    }
     const nextId = list.reduce((m, x) => Math.max(m, x.id), 0) + 1;
     const item = { id: nextId, ...body };
     list.push(item);
