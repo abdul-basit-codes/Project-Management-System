@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-08-15
+
+### Added
+- Task search endpoint with title/assignee/status filters
+- Required-field validation on create for projects, tasks, and members
+- `createdAt`/`updatedAt` timestamps preserved on updates
+
 ## [1.1.0] - 2026-08-14
 
 ### Added
